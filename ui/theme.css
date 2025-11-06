@@ -24,7 +24,7 @@
 }
 
 *{box-sizing:border-box}
-body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:12px;width:360px}
+body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var(--bg);color:var(--fg);margin:0;padding:12px;width:420px}
 
 .app-root{display:flex;flex-direction:column;gap:var(--space-2)}
 
@@ -51,6 +51,10 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var
 
 /* Gauge styles */
 .gauge{width:120px;height:120px}
+.gauge-wrap{flex:0 0 120px;display:flex;align-items:center;justify-content:center;position:relative}
+
+/* emoji picker selection */
+.selected-emoji{outline:2px solid rgba(16,185,129,0.18);border-radius:6px}
 .gauge-bg{fill:none;stroke:#f1f5f9;stroke-width:10}
 .gauge-fill{fill:none;stroke:var(--accent);stroke-width:10;stroke-linecap:round;transform-origin:60px 60px;transform:rotate(-90deg)}
 .gauge-label{text-align:center}
@@ -59,6 +63,8 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var
 
 /* Skill list */
 .skill-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto}
+/* light gray background for the whole skills list area */
+.skill-list{background:#fbfdff;padding:12px;border-radius:10px}
 .skill-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:var(--radius-md);background:var(--card-bg);border:1px solid var(--card-border)}
 .skill-left{display:flex;gap:12px;align-items:center}
 .emoji{font-size:20px}
@@ -81,5 +87,9 @@ input[type="text"]:focus{outline:none;box-shadow:0 0 0 3px rgba(16,185,129,0.12)
 .login-cta{font-size:13px;border-radius:8px;padding:8px 10px}
 
 /* responsive small tweaks */
-@media (max-width:380px){body{width:340px}}
+@media (max-width:480px){body{width:420px}}
+
+/* Button row specifics to avoid wrapping and keep uniform button sizing */
+.button-row .btn{white-space:nowrap;min-width:96px;padding:8px 10px}
+.button-row{display:flex;gap:8px}
 

@@ -20,9 +20,11 @@ export function SkillList(skills, handlers = {}) {
     const left = document.createElement('div');
     left.className = 'skill-left';
 
-    const emoji = document.createElement('div');
-    emoji.className = 'emoji';
-    emoji.textContent = s.emoji || '⭐';
+  const emoji = document.createElement('div');
+  emoji.className = 'emoji';
+  emoji.textContent = s.emoji || '⭐';
+  emoji.style.cursor = 'pointer';
+  emoji.title = 'Change emoji';
 
     const meta = document.createElement('div');
     function renderMeta() {
@@ -46,6 +48,48 @@ export function SkillList(skills, handlers = {}) {
     renderMeta();
     left.appendChild(emoji);
     left.appendChild(meta);
+
+    // emoji picker for existing skill (hidden by default)
+    const emojiPicker = document.createElement('div');
+    emojiPicker.className = 'emoji-picker';
+    emojiPicker.style.display = 'none';
+    emojiPicker.style.marginLeft = '8px';
+    emojiPicker.style.gap = '6px';
+    emojiPicker.style.alignItems = 'center';
+    emojiPicker.style.flexWrap = 'wrap';
+    emojiPicker.style.padding = '6px 0';
+
+    const ROW_EMOJIS = ['🎓','🏃‍♂️','💼','📚','🧘‍♀️','🏋️‍♂️','🎨','🧪','💻','🛠️','⭐'];
+    ROW_EMOJIS.forEach((e) => {
+      const be = document.createElement('button');
+      be.className = 'btn';
+      be.textContent = e;
+      be.style.padding = '6px 8px';
+      be.style.fontSize = '18px';
+      be.addEventListener('click', async (ev) => {
+        // update UI immediately
+        emoji.textContent = e;
+        // hide all other pickers
+        Array.from(document.querySelectorAll('.emoji-picker')).forEach(p => p.style.display = 'none');
+        // persist change
+        if (handlers.onEdit) {
+          try {
+            await handlers.onEdit(s.id, {emoji: e});
+          } catch (err) {
+            if (handlers.onError) handlers.onError(err);
+          }
+        }
+      });
+      emojiPicker.appendChild(be);
+    });
+    left.appendChild(emojiPicker);
+
+    // show/hide picker when emoji clicked
+    emoji.addEventListener('click', (ev) => {
+      // close other pickers
+      Array.from(document.querySelectorAll('.emoji-picker')).forEach(p => { if (p !== emojiPicker) p.style.display = 'none'; });
+      emojiPicker.style.display = emojiPicker.style.display === 'none' ? 'flex' : 'none';
+    });
 
     // right-side controls container
     const rightControls = document.createElement('div');
@@ -159,30 +203,96 @@ export function SkillList(skills, handlers = {}) {
 
   const footer = document.createElement('div');
   footer.className = 'footer';
-  // inline add skill
-  const addRow = document.createElement('div');
-  addRow.style.display = 'flex';
-  addRow.style.gap = '8px';
+
+  // Add button (shows the add panel when clicked)
+  const addBtn = document.createElement('button');
+  addBtn.className = 'btn btn-primary';
+  addBtn.textContent = 'Add skill';
+
+  footer.appendChild(addBtn);
+  wrap.appendChild(footer);
+
+  // Add panel (hidden initially) — contains name input, emoji picker and confirm
+  const addPanel = document.createElement('div');
+  addPanel.style.display = 'none';
+  addPanel.style.marginTop = '8px';
+  addPanel.style.display = 'flex';
+  addPanel.style.flexDirection = 'column';
+  addPanel.style.gap = '8px';
+
   const addInput = document.createElement('input');
   addInput.placeholder = 'New skill name';
   addInput.maxLength = 40;
-  addInput.style.flex = '1';
   addInput.setAttribute('aria-label', 'New skill name');
+
+  // emoji picker row
+  const emojiRow = document.createElement('div');
+  emojiRow.style.display = 'flex';
+  emojiRow.style.gap = '8px';
+
+  // default emoji set (feel free to adjust)
+  const EMOJIS = ['🎓','🏃‍♂️','💼','📚','🧘‍♀️','🏋️‍♂️','🎨','🧪','💻','🛠️'];
+  let selectedEmoji = '⭐';
+
+  EMOJIS.forEach((e) => {
+    const b = document.createElement('button');
+    b.className = 'btn';
+    b.textContent = e;
+    b.style.padding = '6px 8px';
+    b.style.fontSize = '18px';
+    b.addEventListener('click', () => {
+      selectedEmoji = e;
+      // highlight selection
+      Array.from(emojiRow.children).forEach(c => c.classList.remove('selected-emoji'));
+      b.classList.add('selected-emoji');
+    });
+    emojiRow.appendChild(b);
+  });
+
+  // pre-select first emoji
+  if (emojiRow.firstChild) emojiRow.firstChild.classList.add('selected-emoji');
+
+  const addControls = document.createElement('div');
+  addControls.style.display = 'flex';
+  addControls.style.gap = '8px';
+
   const addConfirm = document.createElement('button');
   addConfirm.className = 'btn btn-primary';
   addConfirm.textContent = 'Add';
+
   const addCancel = document.createElement('button');
   addCancel.className = 'btn';
   addCancel.textContent = 'Cancel';
-  addCancel.style.display = 'none';
+
+  addControls.appendChild(addConfirm);
+  addControls.appendChild(addCancel);
+
+  addPanel.appendChild(addInput);
+  addPanel.appendChild(emojiRow);
+  addPanel.appendChild(addControls);
+  footer.appendChild(addPanel);
+
+  addBtn.addEventListener('click', () => {
+    addPanel.style.display = addPanel.style.display === 'none' ? 'flex' : 'none';
+    if (addPanel.style.display !== 'none') {
+      addInput.focus();
+    }
+  });
+
+  addCancel.addEventListener('click', () => {
+    addInput.value = '';
+    addPanel.style.display = 'none';
+  });
 
   addConfirm.addEventListener('click', async () => {
     const v = addInput.value.trim();
     if (!v) return;
     if (handlers.onAdd) {
       try {
-        await handlers.onAdd(v);
+        // pass name and emoji
+        await handlers.onAdd({name: v, emoji: selectedEmoji});
         addInput.value = '';
+        addPanel.style.display = 'none';
       } catch (e) {
         if (handlers.onError) handlers.onError(e);
       }
@@ -191,13 +301,7 @@ export function SkillList(skills, handlers = {}) {
 
   addInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter') addConfirm.click();
-    if (e.key === 'Escape') { addInput.value = ''; }
+    if (e.key === 'Escape') { addInput.value = ''; addPanel.style.display = 'none'; }
   });
-
-  addRow.appendChild(addInput);
-  addRow.appendChild(addConfirm);
-  addRow.appendChild(addCancel);
-  footer.appendChild(addRow);
-  wrap.appendChild(footer);
   return wrap;
 }

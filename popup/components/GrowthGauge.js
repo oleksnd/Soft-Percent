@@ -10,9 +10,10 @@ export function GrowthGauge({ growthPercent = 0, activityScore = 0 }) {
   const progress = Math.min(100, Math.max(0, activityScore)); // clamp 0-100
   const strokeDasharray = `${(progress / 100) * circumference} ${circumference}`;
   
+  // Return a compact gauge element (no outer card) so the parent can place it.
   const el = document.createElement('div');
-  el.className = 'gauge-card card';
-  el.setAttribute('role', 'region');
+  el.className = 'gauge-wrap';
+  el.setAttribute('role', 'img');
   el.setAttribute('aria-label', `Personal Growth: ${growthPercent.toFixed(2)} percent, activity score ${activityScore} out of 100`);
 
   // Create SVG for circular progress
@@ -44,7 +45,7 @@ export function GrowthGauge({ growthPercent = 0, activityScore = 0 }) {
   svg.appendChild(progressArc);
   svgWrap.appendChild(svg);
 
-  // Label in center (absolute)
+  // Value in center of the ring (absolute). No caption text below.
   const label = document.createElement('div');
   label.className = 'gauge-label';
   label.style.position = 'absolute';
@@ -60,15 +61,12 @@ export function GrowthGauge({ growthPercent = 0, activityScore = 0 }) {
   value.className = 'gauge-value';
   value.textContent = `+${growthPercent.toFixed(2)}%`;
 
-  const caption = document.createElement('div');
-  caption.className = 'gauge-caption';
-  caption.textContent = 'Personal Growth';
-
   label.appendChild(value);
-  label.appendChild(caption);
 
+  // assemble minimal gauge element
+  // Attach label inside the svg wrapper so it's centered over the ring
+  svgWrap.appendChild(label);
   el.appendChild(svgWrap);
-  el.appendChild(label);
 
   // Animate on first render
   // set initial dasharray then animate to target

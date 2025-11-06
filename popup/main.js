@@ -67,7 +67,9 @@ async function main() {
   if (!skills || skills.length === 0) {
     root.appendChild(EmptyState({onAdd: async (name) => {
       try {
-        const r = await sendMessage({type: 'ADD_SKILL', payload: {name}});
+        // support payload being either a string or an object {name, emoji}
+        const payload = typeof name === 'string' ? {name} : name || {};
+        const r = await sendMessage({type: 'ADD_SKILL', payload});
         if (r && r.ok) {
           showToast('Skill added');
           await refresh();
@@ -99,8 +101,10 @@ async function main() {
         else showToast('Could not record action');
       }
     },
-    onAdd: async (name) => {
-      const r = await sendMessage({type: 'ADD_SKILL', payload: {name}});
+    onAdd: async (payload) => {
+      // payload may be a string (name) or object {name, emoji}
+      const pl = typeof payload === 'string' ? {name: payload} : (payload || {});
+      const r = await sendMessage({type: 'ADD_SKILL', payload: pl});
       if (r && r.ok) { showToast('Skill added'); await refresh(); }
       else showToast('Failed to add');
     },
