@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "Soft-Percent — Growth Tracker",
+  "version": "0.1.0",
+  "description": "Минималистичный трекер роста — local-first template (MV3).",
+  "icons": {
+    "16": "icons/icon16.svg",
+    "128": "icons/icon128.svg"
+  },
+  "action": {
+    "default_popup": "popup/index.html",
+    "default_icon": {
+      "16": "icons/icon16.svg",
+      "128": "icons/icon128.svg"
+    }
+  },
+  "background": {
+    "service_worker": "background/index.js"
+  },
+  "permissions": ["storage", "alarms"],
+  "host_permissions": [],
+  "optional_permissions": [],
+  "content_scripts": []
+}

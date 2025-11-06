@@ -1,0 +1,6 @@
+body { font-family: Arial, Helvetica, sans-serif; margin: 0; padding: 12px; width: 220px; }
+.wrap { display: flex; flex-direction: column; gap: 8px; }
+h1 { font-size: 16px; margin: 0 0 8px 0; }
+button { padding: 8px 10px; border-radius: 6px; border: 1px solid #888; background: #fafafa; cursor: pointer; }
+.status { color: #333; font-size: 13px; min-height: 18px; }
+.small { font-size: 11px; color: #666; margin-top: 8px; }
