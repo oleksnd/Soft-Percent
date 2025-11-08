@@ -4,17 +4,21 @@
  * @param {number} props.growthPercent - Total growth percentage
  * @param {number} props.activityScore - Activity score 0-100
  */
-export function GrowthGauge({ growthPercent = 0, activityScore = 0 }) {
+// GrowthGauge now displays intra-level progress for personality level.
+// Props: { levelInfo: { level, currentPoints, requiredPoints, totalPoints, title }, activityScore }
+export function GrowthGauge({ levelInfo = null, activityScore = 0 }) {
   const radius = 54;
   const circumference = 2 * Math.PI * radius;
-  const progress = Math.min(100, Math.max(0, activityScore)); // clamp 0-100
+  // compute progress inside current personality level (0..100)
+  const progress = levelInfo && levelInfo.requiredPoints ? Math.max(0, Math.min(1, levelInfo.currentPoints / levelInfo.requiredPoints)) * 100 : 0;
   const strokeDasharray = `${(progress / 100) * circumference} ${circumference}`;
-  
+
   // Return a compact gauge element (no outer card) so the parent can place it.
   const el = document.createElement('div');
   el.className = 'gauge-wrap';
   el.setAttribute('role', 'img');
-  el.setAttribute('aria-label', `Personal Growth: ${growthPercent.toFixed(2)} percent, activity score ${activityScore} out of 100`);
+  const titleText = levelInfo ? `${levelInfo.title}, Lvl ${levelInfo.level}` : 'Personal Growth';
+  el.setAttribute('aria-label', `${titleText}, progress ${progress.toFixed(0)}%, activity score ${activityScore} out of 100`);
 
   // Create SVG for circular progress
   const svgWrap = document.createElement('div');
@@ -25,14 +29,14 @@ export function GrowthGauge({ growthPercent = 0, activityScore = 0 }) {
   const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
   svg.setAttribute('viewBox', '0 0 120 120');
   svg.setAttribute('class', 'gauge');
-  
+
   // Background circle
   const bgCircle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   bgCircle.setAttribute('class', 'gauge-bg');
   bgCircle.setAttribute('cx', '60');
   bgCircle.setAttribute('cy', '60');
   bgCircle.setAttribute('r', String(radius));
-  
+
   // Progress arc
   const progressArc = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
   progressArc.setAttribute('class', 'gauge-fill');
@@ -45,7 +49,7 @@ export function GrowthGauge({ growthPercent = 0, activityScore = 0 }) {
   svg.appendChild(progressArc);
   svgWrap.appendChild(svg);
 
-  // Value in center of the ring (absolute). No caption text below.
+  // Center label: title and level
   const label = document.createElement('div');
   label.className = 'gauge-label';
   label.style.position = 'absolute';
@@ -59,17 +63,19 @@ export function GrowthGauge({ growthPercent = 0, activityScore = 0 }) {
 
   const value = document.createElement('div');
   value.className = 'gauge-value';
-  value.textContent = `+${growthPercent.toFixed(2)}%`;
+  value.textContent = levelInfo ? `${levelInfo.title}, Lvl ${levelInfo.level}` : 'Lvl 0';
+
+  const caption = document.createElement('div');
+  caption.className = 'gauge-caption';
+  caption.textContent = levelInfo ? `${Math.round(levelInfo.currentPoints)}/${Math.round(levelInfo.requiredPoints)} GP` : '';
 
   label.appendChild(value);
+  label.appendChild(caption);
 
-  // assemble minimal gauge element
-  // Attach label inside the svg wrapper so it's centered over the ring
   svgWrap.appendChild(label);
   el.appendChild(svgWrap);
 
   // Animate on first render
-  // set initial dasharray then animate to target
   const target = (progress / 100) * circumference;
   progressArc.style.strokeDasharray = `0 ${circumference}`;
   requestAnimationFrame(() => {

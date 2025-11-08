@@ -1,4 +1,5 @@
 import {GrowthGauge} from './GrowthGauge.js';
+import {calculatePersonalityLevel} from '../../utils/calc.js';
 
 export function GrowthSummary(summary = {}) {
   // single card wrapper — left: gauge, right: details
@@ -9,7 +10,9 @@ export function GrowthSummary(summary = {}) {
   el.style.justifyContent = 'flex-start';
   el.style.gap = '16px';
 
-  const gauge = GrowthGauge({ growthPercent: summary.growthPercent || 0, activityScore: summary.activityScore || 0 });
+  // Determine personality level info (fall back to 0 if not provided)
+  const levelInfo = calculatePersonalityLevel(summary.personalityGrowthIndex || 0);
+  const gauge = GrowthGauge({ levelInfo, activityScore: summary.activityScore || 0 });
   // ensure gauge stays left and has a fixed size
   gauge.style.flex = '0 0 auto';
   el.appendChild(gauge);
@@ -24,7 +27,7 @@ export function GrowthSummary(summary = {}) {
   // Right-side descriptions only; percent is shown inside the ring
   const desc = document.createElement('div');
   desc.className = 'small';
-  desc.textContent = `Personal Growth: +${(summary.growthPercent || 0).toFixed(2)}% — activity ${summary.activityScore || 0}/100`;
+  desc.textContent = `${levelInfo.title}, Lvl ${levelInfo.level} — activity ${summary.activityScore || 0}/100`;
 
   meta.appendChild(desc);
   el.appendChild(meta);

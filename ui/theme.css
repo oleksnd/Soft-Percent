@@ -62,9 +62,20 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var
 .gauge-caption{font-size:12px;color:var(--muted)}
 
 /* Skill list */
-.skill-list{display:flex;flex-direction:column;gap:8px;max-height:320px;overflow:auto}
-/* light gray background for the whole skills list area */
-.skill-list{background:#fbfdff;padding:12px;border-radius:10px}
+.skill-list{display:flex;flex-direction:column;gap:8px}
+
+/* Each skill row should have a subtle gray background (not the whole list) */
+.skill-row{display:flex;align-items:center;justify-content:space-between;padding:12px;border-radius:10px;background:#f6f9fb;border:1px solid var(--card-border)}
+.skill-left{display:flex;gap:12px;align-items:center;flex:1 1 auto}
+.skill-meta{font-size:12px;color:var(--muted);min-width:0}
+.skill-name{font-weight:600;display:flex;align-items:center;gap:8px}
+
+.done-indicator{width:22px;height:22px;border-radius:50%;background:var(--accent);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:12px}
+
+/* Done button style: cleaner rounded check */
+.btn-done{width:44px;height:44px;border-radius:10px;border:1px solid #e6eef7;background:#fff;display:inline-flex;align-items:center;justify-content:center;padding:0}
+.btn-done svg{width:18px;height:18px;display:block}
+.btn-done:disabled{opacity:0.6}
 .skill-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:var(--radius-md);background:var(--card-bg);border:1px solid var(--card-border)}
 .skill-left{display:flex;gap:12px;align-items:center}
 .emoji{font-size:20px}
@@ -73,6 +84,20 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var
 
 .badge{display:inline-block;padding:4px 8px;border-radius:999px;font-size:12px;background:#f1f5f9;color:var(--muted)}
 .badge-done{background:var(--accent);color:#fff}
+
+/* emoji picker popup: ensure it wraps tightly around icons */
+.emoji-picker{display:flex;gap:8px;flex-wrap:wrap;padding:6px;background:#fff;border:1px solid var(--card-border);border-radius:8px;box-shadow:var(--shadow-md);box-sizing:border-box}
+.emoji-picker .btn{padding:6px;width:40px;height:40px;display:inline-flex;align-items:center;justify-content:center;font-size:18px}
+
+/* Achievements banner */
+.achievements{display:flex;flex-direction:column;gap:8px;margin:8px 0}
+.achievement-card{display:flex;align-items:flex-start;gap:12px;padding:10px;border-radius:8px;background:linear-gradient(180deg,#fff,#fbfeff);border:1px solid var(--card-border);box-shadow:var(--shadow-sm)}
+.achievement-left{width:44px;height:44px;border-radius:8px;background:#f1f8f6;display:flex;align-items:center;justify-content:center;font-size:22px}
+.achievement-body{flex:1 1 auto}
+.achievement-title{font-weight:600}
+.achievement-desc{font-size:13px;color:var(--muted);margin-top:4px}
+.achievement-right{display:flex;align-items:flex-start}
+.achievement-close{font-size:14px;padding:4px 8px}
 
 .empty{padding:16px;border-radius:8px;border:1px dashed #e6eef7;text-align:center}
 .note{font-size:13px;color:var(--muted);margin:8px 0}

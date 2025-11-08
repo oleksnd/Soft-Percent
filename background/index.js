@@ -151,8 +151,14 @@ function getState() {
       }
 
       const meta = items.meta || {};
-      const summary = { growthPercent: Number(growthPercent.toFixed(2)), activityScore };
-      resolve({user, skills, meta, summary});
+      // personalityGrowthIndex: for now derive from average cumulativeGrowth (backwards-compatible)
+      const summary = { growthPercent: Number(growthPercent.toFixed(2)), activityScore, personalityGrowthIndex: Number(growthPercent.toFixed(6)), todayKey: today };
+      // also include dayLogs map so UI can analyze achievements / show historical values
+      const dayLogs = {};
+      for (const s of (items.skills || [])) {
+        dayLogs[s.id] = items[`daylog_${s.id}`] || {byDate: {}};
+      }
+      resolve({user, skills, meta, summary, dayLogs});
     });
   });
 }
@@ -183,8 +189,11 @@ function addSkill(payload) {
 
 function checkSkill(skillId) {
   if (!skillId) return Promise.reject(new Error('skillId required'));
-  const today = todayKey();
+  // per-skill dayLog key
   const dayLogKey = `daylog_${skillId}`;
+  // today's date key
+  const today = todayKey();
+  
   return new Promise((resolve, reject) => {
     chrome.storage.sync.get([dayLogKey, 'skills'], (items) => {
       if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
@@ -252,7 +261,8 @@ function checkSkill(skillId) {
       setObj['skills'] = skills;
       safeSetAll(setObj).then(() => {
         try { chrome.alarms.create(`rearm_${skillId}`, {when: skill.rearmAt}); } catch (e) {}
-        resolve({skill});
+        // return the updated full state (same shape as GET_STATE) so the UI can update immediately
+        getState().then((state) => resolve(state)).catch(() => resolve({skill}));
       }).catch((err) => reject(err));
     });
   });

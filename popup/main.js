@@ -1,4 +1,6 @@
 import {sortSkills} from '../utils/calc.js';
+import analyzeAchievements from '../utils/achievements.js';
+import {AchievementBanner} from './components/AchievementBanner.js';
 
 // components
 import {Header} from './components/Header.js';
@@ -45,6 +47,10 @@ function showToast(msg, timeout = 3000) {
 
 async function main() {
   const state = await requestState();
+  renderState(state);
+}
+
+function renderState(state) {
   const skills = sortSkills(state.skills || []);
 
   root.innerHTML = '';
@@ -88,12 +94,28 @@ async function main() {
   // use summary computed by background (includes growthPercent and activityScore)
   root.appendChild(GrowthSummary(state.summary || {}));
 
+  // Achievements banner (between summary and skills)
+  try {
+    const achievements = analyzeAchievements({skills: state.skills || [], dayLogs: state.dayLogs || {}, todayKey: state.summary && state.summary.todayKey});
+    if (achievements && achievements.length) {
+      const banner = AchievementBanner(achievements);
+      root.appendChild(banner);
+    }
+  } catch (e) {
+    // ignore achievements errors — should not block UI
+  }
+
   const listEl = SkillList(skills, {
     onCheck: async (skillId) => {
       const r = await sendMessage({type: 'CHECK_SKILL', payload: {skillId}});
       if (r && r.ok) {
         showToast('Nice — progress recorded');
-        await refresh();
+        // if the background returned the updated state, use it to immediately re-render
+        if (r.result && (r.result.skills || r.result.summary)) {
+          try { renderState(r.result); } catch (e) { await refresh(); }
+        } else {
+          await refresh();
+        }
       } else {
         const err = r && r.error ? r.error : 'unknown';
         if (String(err).includes('daily_cap')) showToast('Two checks per day are credited. Try tomorrow.');
@@ -134,6 +156,17 @@ async function main() {
     }
   });
   root.appendChild(listEl);
+
+  // Schedule a refresh at next local midnight so temporary banners (achievements) disappear
+  try {
+    if (window._midnightRefreshTimer) clearTimeout(window._midnightRefreshTimer);
+    const now = new Date();
+    const next = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 5, 0); // 00:00:05
+    const ms = Math.max(0, next.getTime() - Date.now());
+    window._midnightRefreshTimer = setTimeout(() => { refresh(); }, ms);
+  } catch (e) {
+    // ignore
+  }
 }
 
 async function refresh() { await main(); }
