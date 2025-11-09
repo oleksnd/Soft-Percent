@@ -1,4 +1,6 @@
 // date.js — small date helpers for daily key (local time)
+import { TIME_CONSTANTS } from './constants.js';
+
 export function todayKey(d = new Date()) {
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
@@ -16,7 +18,15 @@ export function startOfDayTimestamp(d = new Date()) {
 }
 
 export function nextLocalMidnight(d = new Date()) {
-  const t = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, 0, 5, 0, 0); // 00:05 next day
+  const t = new Date(
+    d.getFullYear(), 
+    d.getMonth(), 
+    d.getDate() + 1, 
+    TIME_CONSTANTS.DAILY_RESET_HOUR, 
+    TIME_CONSTANTS.DAILY_RESET_MINUTE, 
+    0, 
+    0
+  );
   return t.getTime();
 }
 
@@ -29,3 +39,4 @@ export function isNewLocalDay(lastTs) {
     return true;
   }
 }
+

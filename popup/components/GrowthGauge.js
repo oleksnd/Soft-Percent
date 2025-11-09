@@ -17,8 +17,8 @@ export function GrowthGauge({ levelInfo = null, activityScore = 0 }) {
   const el = document.createElement('div');
   el.className = 'gauge-wrap';
   el.setAttribute('role', 'img');
-  const titleText = levelInfo ? `${levelInfo.title}, Lvl ${levelInfo.level}` : 'Personal Growth';
-  el.setAttribute('aria-label', `${titleText}, progress ${progress.toFixed(0)}%, activity score ${activityScore} out of 100`);
+  // Keep aria concise: don't include descriptive title or activity inside the gauge.
+  el.setAttribute('aria-label', `Personal Growth progress ${progress.toFixed(0)}%, ${activityScore} activity`);
 
   // Create SVG for circular progress
   const svgWrap = document.createElement('div');
@@ -61,13 +61,20 @@ export function GrowthGauge({ levelInfo = null, activityScore = 0 }) {
   label.style.flexDirection = 'column';
   label.style.alignItems = 'center';
 
+  // Inside the gauge: show a compact view — only level (small) and GP counter.
   const value = document.createElement('div');
   value.className = 'gauge-value';
-  value.textContent = levelInfo ? `${levelInfo.title}, Lvl ${levelInfo.level}` : 'Lvl 0';
+  value.textContent = levelInfo ? `Lvl ${levelInfo.level}` : 'Lvl 0';
 
   const caption = document.createElement('div');
   caption.className = 'gauge-caption';
-  caption.textContent = levelInfo ? `${Math.round(levelInfo.currentPoints)}/${Math.round(levelInfo.requiredPoints)} GP` : '';
+  function fmtGP(v) {
+    if (v === null || v === undefined) return '0';
+    const n = Number(v) || 0;
+    // Always show integer GP for clarity
+    return String(Math.round(n));
+  }
+  caption.textContent = levelInfo ? `${fmtGP(levelInfo.currentPoints)}/${fmtGP(levelInfo.requiredPoints)} GP` : '';
 
   label.appendChild(value);
   label.appendChild(caption);

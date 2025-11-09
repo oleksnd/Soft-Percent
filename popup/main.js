@@ -7,6 +7,9 @@ import {Header} from './components/Header.js';
 import {GrowthSummary} from './components/GrowthSummary.js';
 import {SkillList} from './components/SkillList.js';
 import {EmptyState} from './components/EmptyState.js';
+import {SettingsDropdown} from './components/SettingsDropdown.js';
+import {ResetModal} from './components/ResetModal.js';
+import {GlobalMomentum} from './components/GlobalMomentum.js';
 
 const root = document.getElementById('app');
 
@@ -55,6 +58,9 @@ function renderState(state) {
 
   root.innerHTML = '';
 
+  // Track dropdown state
+  let dropdownElement = null;
+
   const header = Header(state.user, async (name) => {
     await sendMessage({type: 'SET_NAME', payload: {name}});
     showToast('Name saved');
@@ -64,9 +70,62 @@ function renderState(state) {
     await sendMessage({type: 'SET_NAME', payload: {name: ''}});
     showToast('Logged out');
     await refresh();
-  }, (on) => {
-    // toggle edit mode - show a tiny badge or enable inline edits (noop for now)
-    if (on) showToast('Edit mode enabled'); else showToast('Edit mode disabled');
+  }, () => {
+    // onOpenSettings - toggle dropdown
+    if (dropdownElement) {
+      dropdownElement.remove();
+      dropdownElement = null;
+    } else {
+      // Create and show dropdown
+      const headerEl = root.querySelector('.header');
+      if (!headerEl) return;
+      
+      // Position dropdown relative to header
+      const wrapper = document.createElement('div');
+      wrapper.style.position = 'relative';
+      wrapper.style.display = 'inline-block';
+      
+      dropdownElement = SettingsDropdown(() => {
+        // onResetAccount - close dropdown and show modal
+        if (dropdownElement) {
+          dropdownElement.remove();
+          dropdownElement = null;
+        }
+        
+        const modal = ResetModal(async () => {
+          // onConfirm - send RESET_ACCOUNT message
+          showToast('Resetting account...');
+          const res = await sendMessage({type: 'RESET_ACCOUNT'});
+          if (res && res.ok) {
+            showToast('Account reset successfully');
+            await refresh();
+          } else {
+            showToast(res?.error || 'Failed to reset account');
+          }
+        }, () => {
+          // onCancel - just close modal (handled by modal itself)
+        });
+        
+        document.body.appendChild(modal);
+      });
+      
+      wrapper.appendChild(dropdownElement);
+      headerEl.appendChild(wrapper);
+      
+      // Close dropdown when clicking outside
+      const closeDropdown = (e) => {
+        if (dropdownElement && !dropdownElement.contains(e.target)) {
+          dropdownElement.remove();
+          dropdownElement = null;
+          document.removeEventListener('click', closeDropdown);
+        }
+      };
+      
+      // Delay to avoid immediate close from the same click that opened it
+      setTimeout(() => {
+        document.addEventListener('click', closeDropdown);
+      }, 0);
+    }
   });
   root.appendChild(header);
 
@@ -93,6 +152,10 @@ function renderState(state) {
 
   // use summary computed by background (includes growthPercent and activityScore)
   root.appendChild(GrowthSummary(state.summary || {}));
+
+  // Global Momentum indicator (under growth summary)
+  const activeDays = state.summary?.uniqueActiveDaysLast7 || 0;
+  root.appendChild(GlobalMomentum(activeDays));
 
   // Achievements banner (between summary and skills)
   try {
@@ -132,27 +195,30 @@ function renderState(state) {
     },
     onError: (e) => { showToast(String(e)); },
     onEdit: async (skillId, patch) => {
-      // patch contains {name, emoji}
-      const items = await sendMessage({type: 'GET_STATE'});
-      if (!items || !items.ok) return showToast('Failed to edit');
-      const skillsNow = items.result.skills || [];
-      const idx = skillsNow.findIndex(s => s.id === skillId);
-      if (idx === -1) return showToast('Skill not found');
-      const skill = skillsNow[idx];
-      const updated = Object.assign({}, skill, patch);
-      skillsNow[idx] = updated;
-      const setRes = await sendMessage({type: 'SAVE_SKILLS', payload: {skills: skillsNow}});
-      if (setRes && setRes.ok) { showToast('Saved'); await refresh(); }
-      else showToast('Failed to save');
+      // patch contains {name, emoji} - use atomic UPDATE_SKILL message
+      const setRes = await sendMessage({
+        type: 'UPDATE_SKILL', 
+        payload: { skillId, patch }
+      });
+      if (setRes && setRes.ok) { 
+        showToast('Saved'); 
+        await refresh(); 
+      } else {
+        showToast(setRes.error || 'Failed to save');
+      }
     },
     onDelete: async (skillId) => {
-      const items = await sendMessage({type: 'GET_STATE'});
-      if (!items || !items.ok) return showToast('Failed to delete');
-      const skillsNow = items.result.skills || [];
-      const filtered = skillsNow.filter(s => s.id !== skillId);
-      const setRes = await sendMessage({type: 'SAVE_SKILLS', payload: {skills: filtered}});
-      if (setRes && setRes.ok) { showToast('Deleted'); await refresh(); }
-      else showToast('Failed to delete');
+      // Use atomic DELETE_SKILL message
+      const setRes = await sendMessage({
+        type: 'DELETE_SKILL',
+        payload: { skillId }
+      });
+      if (setRes && setRes.ok) { 
+        showToast('Deleted'); 
+        await refresh(); 
+      } else {
+        showToast(setRes.error || 'Failed to delete');
+      }
     }
   });
   root.appendChild(listEl);

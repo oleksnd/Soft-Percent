@@ -1,12 +1,23 @@
 // calc.js — growth calculations and sorting using multiplicative compounding
 
+import { 
+  GROWTH_CONFIG, 
+  LEVEL_CONFIG, 
+  TIME_CONSTANTS, 
+  PRECISION,
+  DAILY_LIMITS 
+} from './constants.js';
+
 // Compute number of action days in the last N days from a dayLog { byDate: { 'YYYY-MM-DD': 1 }}
 // Returns integer in [0..days]. If dayLog or dayLog.byDate is missing, returns 0.
-export function computeActionDays(dayLog, todayKey, days = 7) {
+export function computeActionDays(dayLog, todayKey, days = TIME_CONSTANTS.MOMENTUM_LOOKBACK_DAYS) {
   if (!dayLog || !dayLog.byDate) return 0;
+  if (days <= 0) return 0; // Guard against invalid input
+  
   let count = 0;
   const parts = String(todayKey).split('-').map(Number);
   const today = new Date(parts[0], parts[1] - 1, parts[2]);
+  
   for (let i = 0; i < days; i++) {
     const d = new Date(today);
     d.setDate(today.getDate() - i);
@@ -18,24 +29,24 @@ export function computeActionDays(dayLog, todayKey, days = 7) {
 
 // Backwards-compatible wrappers
 export function computeActionDaysLast7(dayLog, todayKey) {
-  return computeActionDays(dayLog, todayKey, 7);
+  return computeActionDays(dayLog, todayKey, TIME_CONSTANTS.MOMENTUM_LOOKBACK_DAYS);
 }
 
 export function computeActionDaysLast30(dayLog, todayKey) {
-  return computeActionDays(dayLog, todayKey, 30);
+  return computeActionDays(dayLog, todayKey, TIME_CONSTANTS.ACTIVITY_LOOKBACK_DAYS);
 }
 
 export function computeMomentum7(dayLog, todayKey) {
   const actionDays = computeActionDaysLast7(dayLog, todayKey);
-  return Math.min(1, actionDays / 7);
+  return Math.min(1, actionDays / TIME_CONSTANTS.MOMENTUM_LOOKBACK_DAYS);
 }
 
-export function computeGrowth(baseG = 0.001, momentum7 = 0) {
+export function computeGrowth(baseG = GROWTH_CONFIG.BASE_RATE, momentum7 = 0) {
   // momentum7 must be in [0,1]
   const m = Math.max(0, Math.min(1, Number(momentum7) || 0));
-  const raw = Number(baseG || 0) + 0.003 * m;
+  const raw = Number(baseG || 0) + GROWTH_CONFIG.MOMENTUM_BONUS * m;
   // clamp both sides to avoid drift/out-of-range values
-  const g = Math.max(0.001, Math.min(0.004, raw));
+  const g = Math.max(GROWTH_CONFIG.MIN_RATE, Math.min(GROWTH_CONFIG.MAX_RATE, raw));
   return g;
 }
 
@@ -43,10 +54,10 @@ export function applyCompounding(cumulativeGrowth, g) {
   // cumulativeGrowth stored as percentage (e.g., 1.5 means +1.5%)
   const cg = Number(cumulativeGrowth) || 0;
   const level = 1 + cg / 100;
-  const next = level * (1 + Number(g) || 0);
+  const next = level * (1 + (Number(g) || 0));
   const newCum = (next - 1) * 100;
-  // Round to 1e-6 to prevent drift when repeatedly compounding and storing
-  return Math.round(newCum * 1e6) / 1e6;
+  // Round to prevent drift when repeatedly compounding and storing
+  return Math.round(newCum * PRECISION.CUMULATIVE_GROWTH_MULTIPLIER) / PRECISION.CUMULATIVE_GROWTH_MULTIPLIER;
 }
 
 export function sortSkills(skills) {
@@ -95,53 +106,78 @@ export function aggregateSummary(skills, options = {}) {
 
 // Personality growth accumulator: simple addition of daily contributions
 export function applyPersonalityGrowth(currentPersonalityGrowthIndex, dailyContribution) {
-  const currentPGI = Number(currentPersonalityGrowthIndex) || 0;
-  const dailyContrib = Number(dailyContribution) || 0;
+  // currentPersonalityGrowthIndex and dailyContribution are expressed in GP (integer-like)
+  const currentPGI = Math.round(Number(currentPersonalityGrowthIndex) || 0);
+  const dailyContrib = Math.round(Number(dailyContribution) || 0);
   const newPGI = currentPGI + dailyContrib;
-  return Math.round(newPGI * 1e6) / 1e6;
+  return Math.round(newPGI);
 }
 
 /**
  * Calculate skill level from totalPoints using a non-linear progression.
- * level = floor(sqrt(totalPoints / 10))
+ * level = floor(LEVEL_CONFIG.SKILL_LEVEL_COEFFICIENT * sqrt(totalPoints))
  * Returns: { level, currentPoints, requiredPoints, totalPoints }
  */
 export function calculateLevel(totalPoints) {
-  // scale totalPoints so small fractional GP become more visible in progression
-  const tpRaw = Number(totalPoints) || 0;
-  const tp = tpRaw * 100; // scale: 1% -> 100 points
-  const level = Math.floor(Math.sqrt(tp / 10));
-  const pointsForCurrentLevel = 10 * Math.pow(level, 2);
-  const pointsForNextLevel = 10 * Math.pow(level + 1, 2);
+  // Skill level formula: level = floor(0.1 * sqrt(totalPoints))
+  // This makes early levels reachable (level 1 at 100 GP) and scales up for higher levels.
+  const tp = Number(totalPoints) || 0; // totalPoints expressed in GP (1% == 1 GP)
+  const level = Math.floor(LEVEL_CONFIG.SKILL_LEVEL_COEFFICIENT * Math.sqrt(tp));
+  
+  // Points needed for current and next level using derived formula:
+  // pointsForLevel(L) = (L / coefficient)^2
+  const pointsForLevel = (lvl) => Math.pow(lvl / LEVEL_CONFIG.SKILL_LEVEL_COEFFICIENT, 2);
+  const pointsForCurrentLevel = pointsForLevel(level);
+  const pointsForNextLevel = pointsForLevel(level + 1);
   const currentPoints = Math.max(0, tp - pointsForCurrentLevel);
   const requiredPoints = pointsForNextLevel - pointsForCurrentLevel;
-  // keep numeric stability
+
   return {
     level,
-    // round to integers after scaling for cleaner display
-    currentPoints: Math.round(currentPoints),
+    // preserve fractional visibility for small GP values (show two decimals)
+    currentPoints: Math.round(currentPoints * 100) / 100,
     requiredPoints: Math.round(requiredPoints),
-    totalPoints: Math.round(tp),
+    totalPoints: Math.round(tp * 100) / 100,
   };
 }
 
 /**
- * Calculate personality-level (same math) and map to a descriptive title.
- * Titles:
- * 0-9: Enthusiast
- * 10-19: Adept
- * 20-29: Virtuoso
- * 30-39: Expert
- * 40+: Master
+ * Calculate personality-level and map to a descriptive title.
+ * Uses different coefficient for slower, more balanced progression.
+ * Titles defined in LEVEL_CONFIG.PERSONALITY_TITLES
  */
 export function calculatePersonalityLevel(totalPoints) {
-  const base = calculateLevel(totalPoints);
-  const lvl = base.level;
-  let title = 'Enthusiast';
-  if (lvl >= 40) title = 'Master';
-  else if (lvl >= 30) title = 'Expert';
-  else if (lvl >= 20) title = 'Virtuoso';
-  else if (lvl >= 10) title = 'Adept';
+  // totalPoints is expected in GP units (integer-like)
+  const tp = Number(totalPoints) || 0;
+  // Personality level formula: level = floor(0.0447 * sqrt(totalPoints))
+  const level = Math.floor(LEVEL_CONFIG.PERSONALITY_LEVEL_COEFFICIENT * Math.sqrt(tp));
 
-  return Object.assign({ title }, base);
+  // Inverse: points required for a given level:
+  // pointsForLevel = (level / 0.0447)^2
+  const pointsForLevel = (lvl) => Math.pow((lvl / LEVEL_CONFIG.PERSONALITY_LEVEL_COEFFICIENT), 2);
+  const pointsForCurrentLevel = Math.max(0, pointsForLevel(level));
+  const pointsForNextLevel = Math.max(0, pointsForLevel(level + 1));
+  const currentPoints = Math.max(0, tp - pointsForCurrentLevel);
+  const requiredPoints = Math.max(0, Math.round(pointsForNextLevel - pointsForCurrentLevel));
+
+  // Determine title based on level thresholds
+  let title = LEVEL_CONFIG.PERSONALITY_TITLES[0];
+  const thresholds = Object.keys(LEVEL_CONFIG.PERSONALITY_TITLES)
+    .map(Number)
+    .sort((a, b) => b - a); // Sort descending
+  
+  for (const threshold of thresholds) {
+    if (level >= threshold) {
+      title = LEVEL_CONFIG.PERSONALITY_TITLES[threshold];
+      break;
+    }
+  }
+
+  return {
+    title,
+    level,
+    currentPoints: Math.round(currentPoints),
+    requiredPoints: Math.round(requiredPoints),
+    totalPoints: Math.round(tp),
+  };
 }

@@ -1,4 +1,5 @@
 import {sortSkills, calculateLevel} from '../../utils/calc.js';
+import {MomentumBar} from './MomentumBar.js';
 
 function msToHms(ms) {
   if (!ms || ms <= 0) return '0m';
@@ -54,22 +55,29 @@ export function SkillList(skills, handlers = {}) {
       info.className = 'skill-meta';
       // show level and GP progress instead of cumulative percent
       try {
-        // ensure we pass a numeric value (1% == 1 GP). calculateLevel expects totalPoints.
-        const cum = Number(s.cumulativeGrowth) || 0;
-        const lvl = calculateLevel(cum);
-  // after scaling, show GP as rounded integers for readability
-  const current = Number(lvl.currentPoints);
-  const required = Number(lvl.requiredPoints);
-  const curStr = Math.round(current);
-  const reqStr = Math.round(required);
-  info.textContent = `since start • Lvl ${lvl.level} • ${curStr}/${reqStr} GP`;
+  // UI-only scaling: stored cumulativeGrowth is a percentage (e.g. 0.31)
+  // Multiply by 100 for display so 0.31 -> 31 GP. Do not change storage.
+  const cumStored = Number(s.cumulativeGrowth) || 0;
+  const cumDisplay = cumStored * 100;
+  const lvl = calculateLevel(cumDisplay);
+  // format GP: integers when >=1, two decimals when <1 so small gains are visible
+  const current = Math.round(Number(lvl.currentPoints) || 0);
+  const required = Math.round(Number(lvl.requiredPoints) || 0);
+  info.textContent = `Lvl ${lvl.level} • ${current}/${required} GP`;
       } catch (e) {
         // fallback to previous percent display if something unexpected happens
-        const cg = Number(s.cumulativeGrowth) || 0;
-        info.textContent = `since start • +${cg.toFixed(4)}%`;
+  const cg = Number(s.cumulativeGrowth) || 0;
+  info.textContent = `+${cg.toFixed(4)}%`;
       }
       meta.appendChild(nameRow);
       meta.appendChild(info);
+      
+      // Add mini momentum bar
+      const momentumContainer = document.createElement('div');
+      momentumContainer.style.marginTop = '6px';
+      const miniBar = MomentumBar(s.actionDaysLast7 || 0, { mini: true });
+      momentumContainer.appendChild(miniBar);
+      meta.appendChild(momentumContainer);
     }
     renderMeta();
     left.appendChild(emoji);

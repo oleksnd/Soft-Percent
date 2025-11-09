@@ -118,3 +118,18 @@ input[type="text"]:focus{outline:none;box-shadow:0 0 0 3px rgba(16,185,129,0.12)
 .button-row .btn{white-space:nowrap;min-width:96px;padding:8px 10px}
 .button-row{display:flex;gap:8px}
 
+/* Momentum indicators */
+.global-momentum{margin-top:12px}
+.momentum-top-row{display:flex;align-items:center;gap:12px}
+.momentum-multiplier{display:flex;align-items:center;gap:6px;font-size:18px;font-weight:600;min-width:70px}
+
+/* Momentum bar - 7 segments */
+.momentum-bar{display:flex;gap:4px;width:100%;height:16px;border-radius:4px;overflow:hidden}
+.momentum-bar-mini{height:8px;gap:2px}
+
+.momentum-segment{flex:1;background:#f1f5f9;border-radius:2px;transition:background 0.3s ease}
+.momentum-bar-mini .momentum-segment{border-radius:1px}
+
+.momentum-segment-filled{transition:background 0.3s ease}
+
+.momentum-explanation{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.4}
