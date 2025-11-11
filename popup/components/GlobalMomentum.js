@@ -51,7 +51,7 @@ export function GlobalMomentum(activeDays = 0) {
   // Explanation text
   const explanation = document.createElement('div');
   explanation.className = 'momentum-explanation';
-  explanation.textContent = 'Ваш Заряд за последние 7 дней. Чем он выше, тем быстрее растет ваш прогресс.';
+  explanation.textContent = 'Your Momentum over the last 7 days. The higher it is, the faster your progress grows.';
   explanation.style.fontSize = '12px';
   explanation.style.color = 'var(--muted)';
   explanation.style.marginTop = '8px';

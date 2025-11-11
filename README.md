@@ -1,23 +1,23 @@
 # Soft-Percent — Chrome Extension Template
 
-Это базовый шаблон расширения Chrome (Manifest V3). Файлы включают:
+This is a minimal Chrome extension template (Manifest V3). Included files:
 
-- `manifest.json` — manifest v3
-- `background.js` — сервис-воркер фонового процесса
-- `content.js` — content script (пример)
-- `popup.html`, `popup.js`, `popup.css` — UI всплывающего окна
-- `icons/` — примитивные SVG-иконки
+- `manifest.json` — extension manifest (v3)
+- `background.js` — service worker background process
+- `content.js` — example content script
+- `popup.html`, `popup.js`, `popup.css` — popup UI
+- `icons/` — simple SVG icons
 
-Как загрузить расширение в режиме разработчика (Unpacked):
+How to load the extension in Developer mode (Unpacked):
 
-1. Откройте chrome://extensions/ в Chrome
-2. Включите "Режим разработчика" (Developer mode)
-3. Нажмите "Load unpacked" (Загрузить распакованное) и укажите папку этого проекта
+1. Open chrome://extensions/ in Chrome
+2. Enable "Developer mode"
+3. Click "Load unpacked" and select this project folder
 
-Примечания:
-- Замените иконки в `icons/` на ваши PNG/SVG при необходимости.
-- Добавляйте/удаляйте разрешения в `manifest.json` по мере роста функциональности.
+Notes:
+- Replace icons in `icons/` with your own PNG/SVG as needed.
+- Add or remove permissions in `manifest.json` as functionality grows.
 
-Примеры/идеи для следующего шага:
-- Добавить опции в `options.html` и прописать `options_ui` в `manifest.json`.
-- Добавить тесты и CI для сборки и проверки lint.
+Next steps / ideas:
+- Add options via `options.html` and set `options_ui` in `manifest.json`.
+- Add tests and CI for builds and linting.

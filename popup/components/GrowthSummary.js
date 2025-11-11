@@ -31,7 +31,7 @@ export function GrowthSummary(summary = {}) {
     const note = document.createElement('div');
     note.className = 'tiny';
     note.style.marginTop = '8px';
-    note.textContent = `Сегодня заработано: +${dailyGP} GP`;
+    note.textContent = `Today's GP earned: +${dailyGP} GP`;
     leftWrap.appendChild(note);
   }
   el.appendChild(leftWrap);

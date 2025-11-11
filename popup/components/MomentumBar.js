@@ -42,14 +42,14 @@ export function MomentumBar(activeDays, options = {}) {
  */
 export function getMomentumData(activeDays) {
   const momentumLevels = [
-    { days: 0, multiplier: 'x1', emoji: '🧘', label: 'Расслабление' },
-    { days: 1, multiplier: 'x1.5', emoji: '🌱', label: 'Росток' },
-    { days: 2, multiplier: 'x2', emoji: '✨', label: 'Искра' },
-    { days: 3, multiplier: 'x2.5', emoji: '💪', label: 'Сила' },
-    { days: 4, multiplier: 'x3', emoji: '⚡️', label: 'Молния' },
-    { days: 5, multiplier: 'x3.5', emoji: '🚀', label: 'Ракета' },
-    { days: 6, multiplier: 'x4', emoji: '🔥', label: 'Огонь' },
-    { days: 7, multiplier: 'x4.5', emoji: '☄️', label: 'Комета' }
+    { days: 0, multiplier: 'x1', emoji: '🧘', label: 'Relaxation' },
+    { days: 1, multiplier: 'x1.5', emoji: '🌱', label: 'Sprout' },
+    { days: 2, multiplier: 'x2', emoji: '✨', label: 'Spark' },
+    { days: 3, multiplier: 'x2.5', emoji: '💪', label: 'Strength' },
+    { days: 4, multiplier: 'x3', emoji: '⚡️', label: 'Lightning' },
+    { days: 5, multiplier: 'x3.5', emoji: '🚀', label: 'Rocket' },
+    { days: 6, multiplier: 'x4', emoji: '🔥', label: 'Fire' },
+    { days: 7, multiplier: 'x4.5', emoji: '☄️', label: 'Comet' }
   ];
   
   return momentumLevels[Math.min(activeDays, 7)];

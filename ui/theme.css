@@ -99,6 +99,23 @@ body{font-family:Inter,system-ui,Segoe UI,Roboto,Arial,sans-serif;background:var
 .achievement-right{display:flex;align-items:flex-start}
 .achievement-close{font-size:14px;padding:4px 8px}
 
+/* Cascade collapsed/expanded styles */
+:root{--ap-card-h:72px}
+.achievement-cascade{display:flex;flex-direction:column;position:relative;padding:0;margin:0}
+.achievement-cascade .achievement-card{height:var(--ap-card-h);min-height:var(--ap-card-h);overflow:hidden;transition:margin 320ms cubic-bezier(.2,.9,.2,1),opacity 260ms ease,transform 260ms ease}
+.achievement-cascade.expanded .achievement-card{height:auto;min-height:unset;overflow:visible}
+.achievement-cascade.collapsed .achievement-card + .achievement-card{margin-top:calc(var(--ap-card-h) * -0.72)}
+.achievement-cascade .achievement-card{width:100%}
+.achievement-cascade .achievement-card .achievement-close{background:transparent;border:none;color:var(--muted);cursor:pointer}
+.achievement-cascade .achievement-card:hover{box-shadow:0 10px 24px rgba(2,6,23,0.06)}
+
+/* slight size decrease for lower cards to give depth when collapsed */
+.achievement-cascade.collapsed .achievement-card:nth-child(2){width:99%}
+.achievement-cascade.collapsed .achievement-card:nth-child(3){width:98.4%}
+.achievement-cascade.collapsed .achievement-card:nth-child(4){width:97.8%}
+
+.achievement-cascade .achievement-card.closing{opacity:0;transform:translateX(12px)}
+
 .empty{padding:16px;border-radius:8px;border:1px dashed #e6eef7;text-align:center}
 .note{font-size:13px;color:var(--muted);margin:8px 0}
 
