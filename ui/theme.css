@@ -150,3 +150,42 @@ input[type="text"]:focus{outline:none;box-shadow:0 0 0 3px rgba(16,185,129,0.12)
 .momentum-segment-filled{transition:background 0.3s ease}
 
 .momentum-explanation{font-size:12px;color:var(--muted);margin-top:8px;line-height:1.4}
+
+/* Focus Session Picker Modal */
+.focus-picker-overlay{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(15,23,42,0.4);backdrop-filter:blur(2px);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeIn 0.2s ease}
+@keyframes fadeIn{from{opacity:0}to{opacity:1}}
+
+.focus-picker-modal{background:#fff;border-radius:12px;padding:24px;min-width:280px;max-width:90%;box-shadow:0 20px 40px rgba(0,0,0,0.15);animation:slideUp 0.3s cubic-bezier(0.2,0.9,0.2,1)}
+@keyframes slideUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+.focus-picker-title{margin:0 0 8px 0;font-size:18px;font-weight:600;color:var(--fg)}
+.focus-picker-subtitle{margin:0 0 20px 0;font-size:14px;color:var(--muted)}
+
+.focus-picker-buttons{display:flex;flex-direction:column;gap:12px;margin-bottom:16px}
+.focus-picker-duration-btn{padding:16px;border-radius:8px;border:1px solid #e6eef7;background:#fff;font-size:16px;font-weight:500;cursor:pointer;transition:all 0.2s ease}
+.focus-picker-duration-btn:hover{background:#f8fafc;border-color:var(--accent);transform:translateY(-1px)}
+.focus-picker-duration-btn:active{transform:translateY(0)}
+
+.focus-picker-cancel-btn{padding:10px;border-radius:6px;border:1px solid #e6eef7;background:#fff;color:var(--muted-2);font-size:14px;cursor:pointer;transition:all 0.2s ease}
+.focus-picker-cancel-btn:hover{background:#f8fafc}
+
+/* Focus Timer Display */
+.focus-timer-display{display:inline-flex;align-items:center;font-family:'SF Mono',Monaco,Consolas,monospace;font-size:14px;font-weight:600;color:#10b981;padding:4px 8px;border-radius:6px;background:#f0fdf4;min-width:60px;justify-content:center}
+
+/* Focus Session Banner (card-style to match app) */
+.focus-session-banner{background:var(--card-bg);border-radius:12px;padding:16px;margin-bottom:16px;border:1px solid var(--card-border);box-shadow:var(--shadow-sm);animation:slideDown 0.3s cubic-bezier(0.2,0.9,0.2,1)}
+@keyframes slideDown{from{opacity:0;transform:translateY(-10px)}to{opacity:1;transform:translateY(0)}}
+
+.focus-banner-content{display:flex;flex-direction:column;align-items:center;gap:12px}
+
+.focus-banner-header{font-size:13px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:0.5px}
+
+.focus-banner-skill{font-size:20px;font-weight:700;color:var(--fg);text-align:center}
+
+.focus-banner-timer{font-size:48px;font-weight:700;color:var(--accent);font-family:'SF Mono',Monaco,Consolas,monospace;letter-spacing:2px}
+
+.focus-banner-controls{display:flex;gap:8px;align-items:center}
+.focus-banner-controls .btn{min-width:96px}
+.focus-banner-pause-btn,.focus-banner-resume-btn,.focus-banner-finish-btn,.focus-banner-cancel-btn{padding:8px 12px;border-radius:8px}
+.focus-banner-finish-btn{background:var(--accent);color:#fff;border:none}
+.focus-banner-cancel-btn{background:transparent;border:1px solid var(--card-border);color:var(--muted)}

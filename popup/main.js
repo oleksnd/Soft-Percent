@@ -1,6 +1,7 @@
 import {sortSkills} from '../utils/calc.js';
 import analyzeAchievements from '../utils/achievements.js';
 import {AchievementBanner} from './components/AchievementBanner.js';
+import {FocusSessionBanner} from './components/FocusSessionBanner.js';
 
 // components
 import {Header} from './components/Header.js';
@@ -57,6 +58,17 @@ function renderState(state) {
   const skills = sortSkills(state.skills || []);
 
   root.innerHTML = '';
+
+  // Focus Session Banner (always render at top, hidden by default)
+  const focusBanner = new FocusSessionBanner({
+    onStop: async () => {
+      await refresh();
+    },
+    onError: (error) => {
+      showToast(String(error));
+    }
+  });
+  root.appendChild(focusBanner.render());
 
   // Track dropdown state
   let dropdownElement = null;
@@ -236,6 +248,16 @@ function renderState(state) {
 }
 
 async function refresh() { await main(); }
+
+// Listen for state updates from background (e.g., when timer completes)
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.type === 'STATE_UPDATED' && message.data) {
+    console.log('📩 Received STATE_UPDATED from background, refreshing popup...');
+    renderState(message.data);
+    showToast('✅ Progress recorded!', 2000);
+  }
+  return false; // No asynchronous response, keep channel closed
+});
 
 main();
 

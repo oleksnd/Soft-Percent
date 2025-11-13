@@ -26,18 +26,24 @@ function daysBetween(aKey, bKey) {
   return Math.abs(diff); // Return absolute value to avoid negative gaps
 }
 
-// Calculate level from cumulative growth (GP)
+// Calculate level from cumulative growth (GP) using fast skill progression formula
+// base 25 GP, multiplier 1.15 (same as main calculateLevel in calc.js for skills)
 function calculateLevel(cumulativeGrowth) {
   const gpDisplay = cumulativeGrowth * 100; // Convert to GP
+  const BASE_GP_SKILL = 25;
+  const MULTIPLIER_SKILL = 1.15;
+
   let level = 0;
-  let totalRequired = 0;
-  
-  while (totalRequired <= gpDisplay) {
+  let totalPointsNeeded = 0;
+  let pointsForNextLevel = BASE_GP_SKILL;
+
+  while (gpDisplay >= totalPointsNeeded + pointsForNextLevel) {
     level++;
-    totalRequired += LEVEL_CONFIG.BASE_REQUIREMENT * Math.pow(LEVEL_CONFIG.SCALING_FACTOR, level - 1);
+    totalPointsNeeded += pointsForNextLevel;
+    pointsForNextLevel = Math.floor(BASE_GP_SKILL * Math.pow(MULTIPLIER_SKILL, level));
   }
-  
-  return Math.max(0, level - 1);
+
+  return level;
 }
 
 export function analyzeAchievements(userData = {}) {

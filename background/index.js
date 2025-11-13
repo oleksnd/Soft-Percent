@@ -93,7 +93,12 @@ function setupAlarms() {
 }
 
 async function handleAlarm(alarm) {
-  if (!alarm || !alarm.name) return;
+  console.log('🔔 ALARM FIRED:', alarm ? alarm.name : 'null alarm', 'at', new Date().toLocaleTimeString());
+  
+  if (!alarm || !alarm.name) {
+    console.warn('⚠️ Invalid alarm object');
+    return;
+  }
   
   if (alarm.name === 'daily-reset') {
     try {
@@ -116,6 +121,155 @@ async function handleAlarm(alarm) {
       }
     } catch (error) {
       console.error('Daily reset failed:', error);
+    }
+  }
+  
+  // Handle Focus Session timer completion
+  if (alarm.name && alarm.name.startsWith('focus_timer_')) {
+    const skillId = alarm.name.replace('focus_timer_', '');
+    console.log('Focus timer completed for skill:', skillId);
+
+    try {
+      // ATOMIC OPERATION: Read and immediately clear the timer data.
+      console.log('📖 Reading timer data from storage...');
+      const { active_focus_timer: timerData } = await new Promise((resolve, reject) => {
+        chrome.storage.sync.get('active_focus_timer', (result) => {
+          console.log('📖 Storage read result:', result);
+          if (chrome.runtime.lastError) {
+            console.error('❌ Storage read error:', chrome.runtime.lastError);
+            return reject(chrome.runtime.lastError);
+          }
+          // Immediately clear the timer to prevent race conditions
+          console.log('🗑️ Clearing timer data from storage...');
+          chrome.storage.sync.remove('active_focus_timer', () => {
+            if (chrome.runtime.lastError) {
+              // This is a secondary error, but we should log it. The primary operation (get) succeeded.
+              console.warn('Failed to remove active_focus_timer after get:', chrome.runtime.lastError.message);
+            } else {
+              console.log('✅ Timer data cleared from storage');
+            }
+            resolve(result);
+          });
+        });
+      });
+
+      console.log('Timer data:', timerData);
+
+      // If there's no timer data, another handler already processed it -> bail out quietly.
+      if (!timerData || !timerData.skillId || timerData.skillId !== skillId) {
+        console.log('No active timer data found or skillId mismatch; skipping (already handled).');
+        try { chrome.alarms.clear(alarm.name); } catch (e) { /* ignore */ }
+        return;
+      }
+
+      // At this point, we have the data and it has been cleared from storage.
+      // The alarm for this timer is also no longer needed.
+      try { chrome.alarms.clear(alarm.name); } catch (e) { /* ignore */ }
+
+      // --- Perform actions now that we have exclusive access to the timer data ---
+
+      // 1. Check the skill to award GP
+      console.log('=== STEP 1: Calling checkSkill for:', skillId);
+      try {
+        const checkResult = await checkSkill(skillId);
+        console.log('=== STEP 1 SUCCESS: checkSkill result:', checkResult);
+        
+        // Notify any open popups to refresh
+        try {
+          chrome.runtime.sendMessage({ type: 'STATE_UPDATED', data: checkResult });
+        } catch (e) {
+          // Popup may not be open, that's fine
+          console.log('Could not notify popup (may be closed)');
+        }
+      } catch (checkErr) {
+        console.error('=== STEP 1 FAILED: checkSkill error:', checkErr);
+      }
+
+      // 2. Play completion sound and show notification
+      console.log('=== STEP 2: Playing sound and creating notification');
+      const skillName = timerData.skillName || 'a skill';
+      
+      // Play sound using offscreen document (since service workers can't use Audio)
+      try {
+        const soundUrl = chrome.runtime.getURL('sounds/complete.mp3');
+        console.log('🔊 Playing sound:', soundUrl);
+        
+        // Create offscreen document to play audio
+        const sendSoundMessage = () => {
+          chrome.runtime.sendMessage({ type: 'PLAY_SOUND', soundUrl }, (response) => {
+            if (chrome.runtime.lastError) {
+              console.warn('Sound message error:', chrome.runtime.lastError.message);
+            } else {
+              console.log('Sound response:', response);
+            }
+          });
+        };
+        
+        chrome.offscreen.createDocument({
+          url: 'offscreen.html',
+          reasons: ['AUDIO_PLAYBACK'],
+          justification: 'Play completion sound'
+        }).then(() => {
+          console.log('✅ Offscreen document created');
+          // Small delay to ensure document is ready
+          setTimeout(sendSoundMessage, 100);
+        }).catch((err) => {
+          // Document may already exist, send message directly
+          console.log('Offscreen doc exists, sending message directly');
+          sendSoundMessage();
+        });
+      } catch (e) {
+        console.warn('Sound playback setup failed:', e);
+      }
+      
+      // Show notification
+      chrome.notifications.create(`focus_complete_${skillId}`, {
+        type: 'basic',
+        iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+        title: '🎉 Focus Complete!',
+        message: `${skillName} - Progress recorded`,
+        priority: 2,
+        requireInteraction: false,
+        silent: true // We play our own sound
+      }, (notificationId) => {
+        if (chrome.runtime.lastError) {
+          console.warn('=== STEP 2: Notification error:', chrome.runtime.lastError.message);
+        } else {
+          console.log('=== STEP 2 SUCCESS: Notification created:', notificationId);
+        }
+      });
+
+      // 3. Clear the badge text
+      console.log('=== STEP 3: Clearing badge');
+      try { 
+        chrome.action.setBadgeText({ text: '' });
+        console.log('=== STEP 3 SUCCESS: Badge cleared');
+      } catch (e) { 
+        console.error('=== STEP 3 FAILED:', e);
+      }
+
+      console.log('=== Focus session completion sequence finished.');
+    } catch (error) {
+      console.error('Focus timer completion failed:', error);
+    }
+  }
+  
+  // Update badge for active timer (runs every minute)
+  if (alarm.name === 'focus_badge_update') {
+    try {
+      const timerData = await getStorage('active_focus_timer');
+      if (timerData && timerData.endTime) {
+        const remaining = Math.max(0, Math.floor((timerData.endTime - Date.now()) / 1000));
+        if (remaining > 0) {
+          const minutes = Math.floor(remaining / 60);
+          chrome.action.setBadgeText({ text: `${minutes}m` });
+          chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
+        } else {
+          chrome.action.setBadgeText({ text: '' });
+        }
+      }
+    } catch (error) {
+      console.error('Badge update failed:', error);
     }
   }
   
@@ -505,25 +659,415 @@ async function resetAccount() {
     await safeSetItem(STORAGE_KEYS.USER, user);
     await safeSetItem(STORAGE_KEYS.SKILLS, []);
     
-    // Clear all alarms and re-setup
-    await new Promise((resolve) => {
-      chrome.alarms.clearAll(() => resolve());
-    });
+    // Clear any active focus timer
+    await safeSetItem('active_focus_timer', null);
+    chrome.action.setBadgeText({ text: '' });
+    chrome.alarms.clearAll();
+    
+    // Re-setup daily alarm
     setupAlarms();
     
-    return { ok: true, message: 'Account reset successfully' };
+    return { success: true };
   } catch (error) {
-    console.error('Reset account failed:', error);
-    throw new Error('Failed to reset account: ' + error.message);
+    console.error('resetAccount failed:', error);
+    throw error;
   }
 }
 
 /**
- * Message handler with structured error responses
+ * START_TIMER: Start a focus session timer for a skill
+ */
+async function startTimer(payload) {
+  if (!payload || !payload.skillId || !payload.durationInSeconds) {
+    throw new Error('skillId and durationInSeconds are required');
+  }
+  
+  const { skillId, durationInSeconds } = payload;
+  const duration = Number(durationInSeconds);
+  
+  if (duration <= 0 || duration > 3 * 60 * 60) {
+    throw new Error('Duration must be between 1 second and 3 hours');
+  }
+  
+  try {
+    // Check if skill exists
+    const skills = await getStorage(STORAGE_KEYS.SKILLS) || [];
+    const skill = skills.find(s => s.id === skillId);
+    if (!skill) {
+      throw new Error('Skill not found');
+    }
+    
+    const endTime = Date.now() + (duration * 1000);
+    
+    // Store active timer info
+    const timerData = {
+      skillId,
+      skillName: skill.name,
+      startTime: Date.now(),
+      endTime,
+      durationInSeconds: duration
+    };
+    
+    console.log('💾 Saving timer data:', timerData);
+    await safeSetItem('active_focus_timer', timerData);
+    
+    // Verify data was saved
+    const savedData = await getStorage('active_focus_timer');
+    console.log('✅ Timer data saved and verified:', savedData);
+    
+    // Create alarm for timer completion
+    const alarmName = `focus_timer_${skillId}`;
+    console.log('⏰ Creating alarm:', alarmName, 'to fire at', new Date(endTime).toLocaleTimeString(), `(in ${duration} seconds)`);
+    chrome.alarms.create(alarmName, {
+      when: endTime
+    });
+    
+    // Verify alarm was created
+    setTimeout(() => {
+      chrome.alarms.get(alarmName, (alarm) => {
+        if (alarm) {
+          console.log('✅ Alarm created successfully:', alarm.name, 'scheduled for', new Date(alarm.scheduledTime).toLocaleTimeString());
+        } else {
+          console.error('❌ Alarm was NOT created!');
+        }
+      });
+    }, 100);
+    
+    // Create/update badge update alarm (runs every minute)
+    chrome.alarms.create('focus_badge_update', {
+      when: Date.now() + 60 * 1000,
+      periodInMinutes: 1
+    });
+    
+    // Set initial badge
+    const minutes = Math.floor(duration / 60);
+    chrome.action.setBadgeText({ text: `${minutes}m` });
+    chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
+    
+    return { success: true, endTime, skillName: skill.name };
+  } catch (error) {
+    console.error('startTimer failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * STOP_TIMER: Cancel an active focus session timer
+ */
+async function stopTimer(payload) {
+  if (!payload || !payload.skillId) {
+    throw new Error('skillId is required');
+  }
+  
+  const { skillId } = payload;
+  
+  try {
+    // Clear timer data
+    await safeSetItem('active_focus_timer', null);
+    
+    // Clear alarms
+    chrome.alarms.clear(`focus_timer_${skillId}`);
+    chrome.alarms.clear('focus_badge_update');
+    
+    // Clear badge
+    chrome.action.setBadgeText({ text: '' });
+    
+    return { success: true };
+  } catch (error) {
+    console.error('stopTimer failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * GET_TIMER_STATUS: Get current active timer info
+ */
+async function getTimerStatus() {
+  try {
+    const timerData = await getStorage('active_focus_timer');
+    // Support paused timers where timerData may have isPaused and remainingSeconds
+    if (!timerData) {
+      return { active: false, timer: null };
+    }
+
+    if (timerData.isPaused) {
+      const remaining = Number(timerData.remainingSeconds) || 0;
+      if (remaining <= 0) {
+        return { active: false, timer: null };
+      }
+      return {
+        active: true,
+        timer: {
+          skillId: timerData.skillId,
+          skillName: timerData.skillName,
+          isPaused: true,
+          remainingSeconds: remaining
+        }
+      };
+    }
+
+    if (!timerData.endTime) {
+      return { active: false, timer: null };
+    }
+
+    const remaining = Math.max(0, Math.floor((timerData.endTime - Date.now()) / 1000));
+
+    if (remaining === 0) {
+      // Timer expired - alarm will handle cleanup, just return inactive state
+      // DO NOT delete timer data here to avoid race with alarm handler
+      console.log('⏱️ Timer expired, waiting for alarm to handle cleanup');
+      return { active: false, timer: null };
+    }
+
+    return {
+      active: true,
+      timer: {
+        skillId: timerData.skillId,
+        skillName: timerData.skillName,
+        startTime: timerData.startTime,
+        endTime: timerData.endTime,
+        remainingSeconds: remaining
+      }
+    };
+  } catch (error) {
+    console.error('getTimerStatus failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * PAUSE_TIMER: Pause an active focus session
+ */
+async function pauseTimer(payload) {
+  if (!payload || !payload.skillId) throw new Error('skillId is required');
+  const { skillId } = payload;
+
+  try {
+    const timerData = await getStorage('active_focus_timer');
+    if (!timerData || timerData.skillId !== skillId) {
+      throw new Error('No active timer for this skill');
+    }
+
+    // Calculate remaining seconds
+    const remaining = timerData.isPaused
+      ? Number(timerData.remainingSeconds) || 0
+      : Math.max(0, Math.floor((timerData.endTime - Date.now()) / 1000));
+
+    // Save paused state atomically
+    const paused = {
+      skillId: timerData.skillId,
+      skillName: timerData.skillName,
+      remainingSeconds: remaining,
+      isPaused: true,
+      pausedAt: Date.now()
+    };
+
+    await safeSetItem('active_focus_timer', paused);
+
+    // Clear alarms
+    chrome.alarms.clear(`focus_timer_${skillId}`);
+    chrome.alarms.clear('focus_badge_update');
+
+    // Update badge to indicate paused (show remaining minutes)
+    try {
+      const minutes = Math.max(1, Math.floor(remaining / 60));
+      chrome.action.setBadgeText({ text: `||${minutes}m` });
+      chrome.action.setBadgeBackgroundColor({ color: '#f59e0b' });
+    } catch (e) { /* ignore */ }
+
+    return { success: true, remainingSeconds: remaining };
+  } catch (error) {
+    console.error('pauseTimer failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * RESUME_TIMER: Resume a paused focus session
+ */
+async function resumeTimer(payload) {
+  if (!payload || !payload.skillId) throw new Error('skillId is required');
+  const { skillId } = payload;
+
+  try {
+    const timerData = await getStorage('active_focus_timer');
+    if (!timerData || !timerData.isPaused || timerData.skillId !== skillId) {
+      throw new Error('No paused timer for this skill');
+    }
+
+    const remaining = Number(timerData.remainingSeconds) || 0;
+    if (remaining <= 0) {
+      throw new Error('No remaining time to resume');
+    }
+
+    const endTime = Date.now() + remaining * 1000;
+    const newData = {
+      skillId: timerData.skillId,
+      skillName: timerData.skillName,
+      startTime: Date.now(),
+      endTime,
+      durationInSeconds: remaining,
+      isPaused: false
+    };
+
+    await safeSetItem('active_focus_timer', newData);
+
+    // Create alarm
+    chrome.alarms.create(`focus_timer_${skillId}`, { when: endTime });
+    chrome.alarms.create('focus_badge_update', { when: Date.now() + 60 * 1000, periodInMinutes: 1 });
+
+    // Set initial badge
+    try {
+      const minutes = Math.max(1, Math.floor(remaining / 60));
+      chrome.action.setBadgeText({ text: `${minutes}m` });
+      chrome.action.setBadgeBackgroundColor({ color: '#10b981' });
+    } catch (e) { /* ignore */ }
+
+    return { success: true, endTime };
+  } catch (error) {
+    console.error('resumeTimer failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * FINISH_TIMER_EARLY: Immediately finish session and award GP
+ */
+async function finishTimerEarly(payload) {
+  if (!payload || !payload.skillId) throw new Error('skillId is required');
+  const { skillId } = payload;
+
+  try {
+    // ATOMIC OPERATION: Read and immediately clear the timer data.
+    const { active_focus_timer: timerData } = await new Promise((resolve, reject) => {
+      chrome.storage.sync.get('active_focus_timer', (result) => {
+        if (chrome.runtime.lastError) return reject(chrome.runtime.lastError);
+        chrome.storage.sync.remove('active_focus_timer', () => {
+          if (chrome.runtime.lastError) console.warn('Failed to remove active_focus_timer after get:', chrome.runtime.lastError.message);
+          resolve(result);
+        });
+      });
+    });
+
+    if (!timerData || timerData.skillId !== skillId) {
+      throw new Error('No active timer for this skill to finish.');
+    }
+
+    // Clear any alarms associated with the timer
+    chrome.alarms.clear(`focus_timer_${skillId}`);
+    chrome.alarms.clear('focus_badge_update');
+
+    // --- Perform actions now that we have exclusive access to the timer data ---
+
+    // 1. Call checkSkill to award GP
+    console.log('=== FINISH EARLY STEP 1: Calling checkSkill for:', skillId);
+    try {
+      const checkResult = await checkSkill(skillId);
+      console.log('=== FINISH EARLY STEP 1 SUCCESS');
+      
+      // Notify any open popups to refresh
+      try {
+        chrome.runtime.sendMessage({ type: 'STATE_UPDATED', data: checkResult });
+      } catch (e) {
+        console.log('Could not notify popup (may be closed)');
+      }
+    } catch (checkErr) {
+      console.error('=== FINISH EARLY STEP 1 FAILED:', checkErr);
+    }
+
+    // 2. Play sound and show notification
+    console.log('=== FINISH EARLY STEP 2: Playing sound and creating notification');
+    const skillName = timerData.skillName || 'a skill';
+    
+    // Play sound
+    try {
+      const soundUrl = chrome.runtime.getURL('sounds/complete.mp3');
+      console.log('🔊 Playing sound:', soundUrl);
+      
+      chrome.offscreen.createDocument({
+        url: 'offscreen.html',
+        reasons: ['AUDIO_PLAYBACK'],
+        justification: 'Play completion sound'
+      }).then(() => {
+        console.log('✅ Offscreen document created');
+        chrome.runtime.sendMessage({ type: 'PLAY_SOUND', soundUrl }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.warn('Sound message error:', chrome.runtime.lastError.message);
+          } else {
+            console.log('Sound response:', response);
+          }
+        });
+      }).catch(() => {
+        console.log('Offscreen doc exists, sending message directly');
+        chrome.runtime.sendMessage({ type: 'PLAY_SOUND', soundUrl }, (response) => {
+          if (chrome.runtime.lastError) {
+            console.warn('Sound message error:', chrome.runtime.lastError.message);
+          } else {
+            console.log('Sound response:', response);
+          }
+        });
+      });
+    } catch (e) {
+      console.warn('Sound playback setup failed:', e);
+    }
+    
+    // Show notification (without icon)
+    chrome.notifications.create(`focus_complete_${skillId}`, {
+      type: 'basic',
+      title: '🎉 Focus Complete!',
+      message: `${skillName} - Progress recorded`,
+      priority: 2,
+      requireInteraction: false,
+      silent: true
+    }, (nid) => { 
+      if (chrome.runtime.lastError) {
+        console.warn('=== FINISH EARLY STEP 2: Notification error:', chrome.runtime.lastError.message);
+      } else {
+        console.log('=== FINISH EARLY STEP 2 SUCCESS:', nid);
+      }
+    });
+
+    // 3. Clear the badge
+    console.log('=== FINISH EARLY STEP 3: Clearing badge');
+    try { 
+      chrome.action.setBadgeText({ text: '' });
+      console.log('=== FINISH EARLY STEP 3 SUCCESS');
+    } catch (e) { 
+      console.error('=== FINISH EARLY STEP 3 FAILED:', e);
+    }
+
+    return { success: true };
+  } catch (error) {
+    console.error('finishTimerEarly failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * CANCEL_TIMER: Cancel session without awarding GP
+ */
+async function cancelTimer(payload) {
+  if (!payload || !payload.skillId) throw new Error('skillId is required');
+  const { skillId } = payload;
+
+  try {
+    await safeSetItem('active_focus_timer', null);
+    chrome.alarms.clear(`focus_timer_${skillId}`);
+    chrome.alarms.clear('focus_badge_update');
+    try { chrome.action.setBadgeText({ text: '' }); } catch (e) { /* ignore */ }
+    return { success: true };
+  } catch (error) {
+    console.error('cancelTimer failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Message router with proper error handling
  */
 async function handleMessage(msg, sender) {
   if (!msg || !msg.type) {
-    throw new Error('Invalid message: type is required');
+    throw new Error('Invalid message format');
   }
   
   try {
@@ -532,17 +1076,21 @@ async function handleMessage(msg, sender) {
         return await getState();
       
       case 'ADD_SKILL':
+        if (!msg.payload) {
+          throw new Error('Payload is required');
+        }
         return await addSkill(msg.payload);
       
       case 'CHECK_SKILL':
         if (!msg.payload || !msg.payload.skillId) {
           throw new Error('Skill ID is required');
         }
+        // checkSkill expects the skillId string, not the whole payload object
         return await checkSkill(msg.payload.skillId);
       
       case 'UPDATE_SKILL':
-        if (!msg.payload || !msg.payload.skillId) {
-          throw new Error('Skill ID is required');
+        if (!msg.payload || !msg.payload.skillId || !msg.payload.patch) {
+          throw new Error('skillId and patch are required');
         }
         return await updateSkill(msg.payload.skillId, msg.payload.patch);
       
@@ -560,6 +1108,45 @@ async function handleMessage(msg, sender) {
       
       case 'RESET_ACCOUNT':
         return await resetAccount();
+      
+      case 'START_TIMER':
+        if (!msg.payload) {
+          throw new Error('Payload is required');
+        }
+        return await startTimer(msg.payload);
+
+      case 'PAUSE_TIMER':
+        if (!msg.payload) {
+          throw new Error('Payload is required');
+        }
+        return await pauseTimer(msg.payload);
+
+      case 'RESUME_TIMER':
+        if (!msg.payload) {
+          throw new Error('Payload is required');
+        }
+        return await resumeTimer(msg.payload);
+
+      case 'FINISH_TIMER_EARLY':
+        if (!msg.payload) {
+          throw new Error('Payload is required');
+        }
+        return await finishTimerEarly(msg.payload);
+
+      case 'CANCEL_TIMER':
+        if (!msg.payload) {
+          throw new Error('Payload is required');
+        }
+        return await cancelTimer(msg.payload);
+      
+      case 'STOP_TIMER':
+        if (!msg.payload) {
+          throw new Error('Payload is required');
+        }
+        return await stopTimer(msg.payload);
+      
+      case 'GET_TIMER_STATUS':
+        return await getTimerStatus();
       
       // Legacy support for SAVE_SKILLS (deprecated - use UPDATE_SKILL instead)
       case 'SAVE_SKILLS':
@@ -590,8 +1177,11 @@ async function handleMessage(msg, sender) {
  * Initialization and event listeners
  */
 
+console.log('🚀 Service Worker Started at', new Date().toLocaleTimeString());
+
 // Initialize on install
 chrome.runtime.onInstalled.addListener(async () => {
+  console.log('📦 Extension installed/updated');
   try {
     const meta = (await getStorage(STORAGE_KEYS.META)) || {};
     meta.version = meta.version || 1;
@@ -603,9 +1193,11 @@ chrome.runtime.onInstalled.addListener(async () => {
 });
 
 // Setup alarms on worker start (resilient to worker termination)
+console.log('⚙️ Setting up alarms...');
 setupAlarms();
 
 // Alarm listener
+console.log('👂 Registering alarm listener...');
 chrome.alarms.onAlarm.addListener((alarm) => {
   handleAlarm(alarm).catch((error) => {
     console.error('Alarm handler failed:', error);

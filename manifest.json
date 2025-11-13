@@ -18,7 +18,13 @@
     "service_worker": "background/index.js",
     "type": "module"
   },
-  "permissions": ["storage", "alarms"],
+  "permissions": ["storage", "alarms", "notifications", "offscreen"],
+  "web_accessible_resources": [
+    {
+      "resources": ["sounds/complete.mp3"],
+      "matches": ["<all_urls>"]
+    }
+  ],
   "host_permissions": [],
   "optional_permissions": [],
   "content_scripts": []

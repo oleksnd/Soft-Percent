@@ -114,64 +114,73 @@ export function applyPersonalityGrowth(currentPersonalityGrowthIndex, dailyContr
 }
 
 /**
- * Calculate skill level from totalPoints using a non-linear progression.
- * level = floor(LEVEL_CONFIG.SKILL_LEVEL_COEFFICIENT * sqrt(totalPoints))
+ * Calculate skill level from totalPoints using fast exponential progression.
+ * Formula: base 25 GP for level 1, multiplier 1.15 (each level 15% harder).
  * Returns: { level, currentPoints, requiredPoints, totalPoints }
  */
 export function calculateLevel(totalPoints) {
-  // Skill level formula: level = floor(0.1 * sqrt(totalPoints))
-  // This makes early levels reachable (level 1 at 100 GP) and scales up for higher levels.
-  const tp = Number(totalPoints) || 0; // totalPoints expressed in GP (1% == 1 GP)
-  const level = Math.floor(LEVEL_CONFIG.SKILL_LEVEL_COEFFICIENT * Math.sqrt(tp));
-  
-  // Points needed for current and next level using derived formula:
-  // pointsForLevel(L) = (L / coefficient)^2
-  const pointsForLevel = (lvl) => Math.pow(lvl / LEVEL_CONFIG.SKILL_LEVEL_COEFFICIENT, 2);
-  const pointsForCurrentLevel = pointsForLevel(level);
-  const pointsForNextLevel = pointsForLevel(level + 1);
-  const currentPoints = Math.max(0, tp - pointsForCurrentLevel);
-  const requiredPoints = pointsForNextLevel - pointsForCurrentLevel;
+  const tp = Number(totalPoints) || 0; // totalPoints expressed in GP
+  const BASE_GP_SKILL = 25;
+  const MULTIPLIER_SKILL = 1.15;
+
+  let level = 0;
+  let totalPointsNeeded = 0;
+  let pointsForNextLevel = BASE_GP_SKILL; // base cost for level 1
+
+  // Iteratively determine the level by accumulating required points
+  while (tp >= totalPointsNeeded + pointsForNextLevel) {
+    level++;
+    totalPointsNeeded += pointsForNextLevel;
+    // Calculate next level cost: base * (multiplier ^ (level - 1))
+    pointsForNextLevel = Math.floor(BASE_GP_SKILL * Math.pow(MULTIPLIER_SKILL, level));
+  }
+
+  const currentPoints = Math.max(0, tp - totalPointsNeeded);
+  const requiredPoints = pointsForNextLevel;
 
   return {
     level,
-    // preserve fractional visibility for small GP values (show two decimals)
-    currentPoints: Math.round(currentPoints * 100) / 100,
+    currentPoints: Math.round(currentPoints),
     requiredPoints: Math.round(requiredPoints),
-    totalPoints: Math.round(tp * 100) / 100,
+    totalPoints: Math.round(tp),
   };
 }
 
 /**
- * Calculate personality-level and map to a descriptive title.
- * Uses different coefficient for slower, more balanced progression.
- * Titles defined in LEVEL_CONFIG.PERSONALITY_TITLES
+ * Calculate personality-level and map to a descriptive title (rank).
+ * Uses slower exponential formula: base 100 GP, multiplier 1.1 (10% increase per level).
+ * Titles/ranks: Enthusiast (1-9), Adept (10-19), Virtuoso (20-29), Expert (30-39),
+ * Master (40-49), Grandmaster (50-59), Legend (60-69), Mythic (70+)
  */
 export function calculatePersonalityLevel(totalPoints) {
-  // totalPoints is expected in GP units (integer-like)
-  const tp = Number(totalPoints) || 0;
-  // Personality level formula: level = floor(0.0447 * sqrt(totalPoints))
-  const level = Math.floor(LEVEL_CONFIG.PERSONALITY_LEVEL_COEFFICIENT * Math.sqrt(tp));
+  const tp = Number(totalPoints) || 0; // totalPoints in GP units
+  const BASE_GP_PERSONALITY = 100;
+  const MULTIPLIER_PERSONALITY = 1.1;
 
-  // Inverse: points required for a given level:
-  // pointsForLevel = (level / 0.0447)^2
-  const pointsForLevel = (lvl) => Math.pow((lvl / LEVEL_CONFIG.PERSONALITY_LEVEL_COEFFICIENT), 2);
-  const pointsForCurrentLevel = Math.max(0, pointsForLevel(level));
-  const pointsForNextLevel = Math.max(0, pointsForLevel(level + 1));
-  const currentPoints = Math.max(0, tp - pointsForCurrentLevel);
-  const requiredPoints = Math.max(0, Math.round(pointsForNextLevel - pointsForCurrentLevel));
+  let level = 0;
+  let totalPointsNeeded = 0;
+  let pointsForNextLevel = BASE_GP_PERSONALITY; // base cost for level 1
 
-  // Determine title based on level thresholds
-  let title = LEVEL_CONFIG.PERSONALITY_TITLES[0];
-  const thresholds = Object.keys(LEVEL_CONFIG.PERSONALITY_TITLES)
-    .map(Number)
-    .sort((a, b) => b - a); // Sort descending
-  
-  for (const threshold of thresholds) {
-    if (level >= threshold) {
-      title = LEVEL_CONFIG.PERSONALITY_TITLES[threshold];
-      break;
-    }
+  // Iteratively determine the level
+  while (tp >= totalPointsNeeded + pointsForNextLevel) {
+    level++;
+    totalPointsNeeded += pointsForNextLevel;
+    pointsForNextLevel = Math.floor(BASE_GP_PERSONALITY * Math.pow(MULTIPLIER_PERSONALITY, level));
   }
+
+  const currentPoints = Math.max(0, tp - totalPointsNeeded);
+  const requiredPoints = pointsForNextLevel;
+
+  // Determine title (rank) based on level ranges
+  let title = 'Enthusiast';
+  if (level >= 70) title = 'Mythic';
+  else if (level >= 60) title = 'Legend';
+  else if (level >= 50) title = 'Grandmaster';
+  else if (level >= 40) title = 'Master';
+  else if (level >= 30) title = 'Expert';
+  else if (level >= 20) title = 'Virtuoso';
+  else if (level >= 10) title = 'Adept';
+  // else title remains 'Enthusiast' (1-9)
 
   return {
     title,

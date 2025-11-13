@@ -1,5 +1,6 @@
 import {sortSkills, calculateLevel} from '../../utils/calc.js';
 import {MomentumBar} from './MomentumBar.js';
+import {FocusSessionPicker} from './FocusSessionPicker.js';
 
 function msToHms(ms) {
   if (!ms || ms <= 0) return '0m';
@@ -182,6 +183,43 @@ export function SkillList(skills, handlers = {}) {
     rightControls.style.alignItems = 'center';
     rightControls.style.gap = '8px';
 
+    // Play button for starting focus session
+    const playBtn = document.createElement('button');
+    playBtn.className = 'btn btn-ghost';
+    playBtn.innerHTML = '▶️';
+    playBtn.title = 'Start focus session';
+    playBtn.style.fontSize = '16px';
+    playBtn.style.padding = '4px 8px';
+
+    // Play button handler
+    playBtn.addEventListener('click', () => {
+      const picker = new FocusSessionPicker({
+        skillName: s.name,
+        onStart: async (durationInSeconds) => {
+          try {
+            const response = await chrome.runtime.sendMessage({
+              type: 'START_TIMER',
+              payload: { skillId: s.id, durationInSeconds }
+            });
+            
+            if (!response.ok && handlers.onError) {
+              handlers.onError(new Error(response.error || 'Failed to start timer'));
+            }
+          } catch (error) {
+            if (handlers.onError) {
+              handlers.onError(error);
+            }
+          }
+        },
+        onCancel: () => {
+          // Just close the picker
+        }
+      });
+      
+      const pickerElement = picker.render();
+      document.body.appendChild(pickerElement);
+    });
+
   const btn = document.createElement('button');
   btn.className = 'btn-done';
   btn.setAttribute('aria-label', `Mark ${s.name} done today`);
@@ -320,6 +358,7 @@ export function SkillList(skills, handlers = {}) {
         renderMeta();
       }
     });
+  rightControls.appendChild(playBtn);
   rightControls.appendChild(settingsBtn);
   rightControls.appendChild(btn);
 
